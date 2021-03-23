@@ -49,6 +49,10 @@ type (
 	}
 )
 
+func (p *Peer) Addr() string {
+	return p.addr.String()
+}
+
 var app = &payment.App{Addr: &ethwallet.Address{}}
 
 // MakeAmountFromETH creates an `ETHAmount` with the given amount of ethereum set.
@@ -107,6 +111,10 @@ func DeployContracts(ctx context.Context, wallet *Wallet, chainURL string) (comm
 		return common.Address{}, common.Address{}, errors.WithMessage(err, "deploying assetholder")
 	}
 	return adj, ah, errors.WithMessage(err, "initializing peer")
+}
+
+func SetApp(app channel.App) {
+	channel.RegisterApp(app)
 }
 
 // SetLogLevel can be used to define how verbose the log output should be.
