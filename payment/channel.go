@@ -88,13 +88,16 @@ func transferBal(bals []channel.Bal, me channel.Index, amount ETHAmount) {
 }
 
 // Close gracefully closes the channel. All funds will be distributed on-chain.
-func (c *Channel) Close(ctx context.Context) error {
-	return c.close(ctx, true)
+// If the `secondary` flag is set to true, the Adjudicator runs an optimized
+// protocol, where it is assumed that the other peer also settles the channel.
+func (c *Channel) Close(ctx context.Context, secondary bool) error {
+	return c.close(ctx, true, secondary)
 }
 
 // closes the channel. `remove` indicates whether the channel should be
-// removed from the client.
-func (c *Channel) close(ctx context.Context, remove bool) error {
+// removed from the client. `secondary` indicates whether it is assumed that the
+// other peers also settles the channel.
+func (c *Channel) close(ctx context.Context, remove, secondary bool) error {
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
 	if c.closer.IsClosed() {
@@ -116,7 +119,7 @@ func (c *Channel) close(ctx context.Context, remove bool) error {
 	if err := c.ch.Register(ctx); err != nil {
 		return errors.WithMessage(err, "registering channel")
 	}
-	if err := c.ch.Settle(ctx, false); err != nil {
+	if err := c.ch.Settle(ctx, secondary); err != nil {
 		return errors.WithMessage(err, "settling channel")
 	}
 
@@ -151,7 +154,7 @@ func (c *Channel) Balance() Balance {
 // It is called by the framework for adjudicator events.
 func (c *Channel) HandleAdjudicatorEvent(_e channel.AdjudicatorEvent) {
 	if _, ok := _e.(*channel.ConcludedEvent); ok {
-		go c.Close(c.closer.Ctx()) // nolint: errcheck
+		go c.Close(c.closer.Ctx(), true) // nolint: errcheck
 	}
 }
 

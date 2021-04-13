@@ -90,12 +90,11 @@ func HandleChannel(ctx context.Context, cfg Config, ch *payment.Channel, alias s
 	log := log.WithField("alias", alias)
 	// 1.
 	log.Info("HandleChannel - echoing")
-loop:
 	for i := 0; i < 3; i++ {
 		received := <-ch.Received()
 		if received == nil {
 			log.Info("Received nil state, closing")
-			break loop
+			return
 		}
 		log.Infof("Received: %f ETH - sleeping", received.ETH())
 		time.Sleep(1 * time.Second)
@@ -117,16 +116,13 @@ loop:
 		}
 	}
 	// 2.
-closing:
 	for {
 		log.Info("HandleChannel - closing")
 		closeCtx, cancel := context.WithTimeout(ctx, cfg.CloseTimeout)
 		defer cancel()
-		if err := ch.Close(closeCtx); err != nil {
+		if err := ch.Close(closeCtx, false); err != nil {
 			log.WithError(err).Error("Could not close channel")
-			continue closing
 		}
 		log.Info("HandleChannel finished")
-		break closing
 	}
 }

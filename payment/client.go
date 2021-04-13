@@ -253,7 +253,7 @@ func (c *Client) Close(ctx context.Context) error {
 		ch := ch
 		c.log().WithField("id", id).Debug("Closing channel")
 		errG.Go(func() error {
-			return ch.close(ctx, false)
+			return ch.close(ctx, false, false)
 		})
 	}
 	if err := errG.Wait(); err != nil {
