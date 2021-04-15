@@ -58,8 +58,8 @@ type Client struct {
 	funder channel.Funder
 	perun  *client.Client
 
-	dialer   *simple.Dialer
-	listener *simple.Listener
+	dialer   Dialer
+	listener net.Listener
 	bus      *net.Bus
 	peers    map[common.Address]Peer
 
@@ -74,7 +74,7 @@ type Client struct {
 // In the local ganache-cli case this would be: ws://0.0.0.0:8545
 // `challengeDuration` is the time in seconds that an on-chain challenge
 // will last. This should be at least 3 times the average block time.
-func NewClient(wallet *Wallet, cfg Config) (*Client, error) {
+func NewClient(wallet *Wallet, cfg Config, opts ...ClientOption) (*Client, error) {
 	if uint64(cfg.ChallengeDuration) == 0 {
 		return nil, errors.New("invalid challenge duration")
 	}
@@ -89,27 +89,31 @@ func NewClient(wallet *Wallet, cfg Config) (*Client, error) {
 		return nil, errors.WithMessage(err, "connecting to ethereum node")
 	}
 	cb := ethchannel.NewContractBackend(chain, wallet.transactor)
-	// Setup network.
-	dialer := simple.NewTCPDialer(cfg.DialTimeout)
-	listener, err := simple.NewTCPListener(cfg.Host)
-	if err != nil {
-		return nil, errors.WithMessage(err, "creating listener")
-	}
-	bus := net.NewBus(wallet.wAcc, dialer)
-
-	return &Client{
+	client := &Client{
 		logger:    log.MakeEmbedding(log.WithField("role", "client")),
 		cfg:       cfg,
 		wallet:    wallet,
 		chain:     chain,
 		cb:        cb,
-		dialer:    dialer,
-		listener:  listener,
-		bus:       bus,
 		peers:     make(map[common.Address]Peer),
 		proposals: make(chan *ChannelProposal, cfg.ProposalBufferSize),
 		channels:  make(map[channel.ID]*Channel),
-	}, nil
+	}
+	// Setup Dialer and Listener with respect to the passed options.
+	for _, opt := range opts {
+		opt(client)
+	}
+	if client.dialer == nil {
+		client.dialer = simple.NewTCPDialer(cfg.DialTimeout)
+	}
+	if client.listener == nil {
+		client.listener, err = simple.NewTCPListener(cfg.Host)
+		if err != nil {
+			return nil, errors.WithMessage(err, "creating listener")
+		}
+	}
+	client.bus = net.NewBus(wallet.wAcc, client.dialer)
+	return client, nil
 }
 
 // Init sets and verifies the addresses of the Adjudicator and
