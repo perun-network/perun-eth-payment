@@ -250,22 +250,26 @@ func (c *Client) Close(ctx context.Context) error {
 	c.chMtx.RLock()
 	defer c.chMtx.RUnlock()
 
-	errG := perunerrors.NewGatherer()
-	for id, ch := range c.channels {
-		ch := ch
-		c.log().WithField("id", id).Debug("Closing channel")
-		errG.Go(func() error {
-			return ch.close(ctx, false)
-		})
+	var clientErr error
+	// It should be possible to close a client before calling `Init()`.
+	if c.perun != nil {
+		errG := perunerrors.NewGatherer()
+		for id, ch := range c.channels {
+			ch := ch
+			c.log().WithField("id", id).Debug("Closing channel")
+			errG.Go(func() error {
+				return ch.close(ctx, false)
+			})
+		}
+		if err := errG.Wait(); err != nil {
+			return err
+		}
+		if err := c.closer.Close(); err != nil {
+			c.log().WithError(err).Error("Could not close Closer")
+		}
+		close(c.proposals)
+		clientErr = c.perun.Close()
 	}
-	if err := errG.Wait(); err != nil {
-		return err
-	}
-	if err := c.closer.Close(); err != nil {
-		c.log().WithError(err).Error("Could not close Closer")
-	}
-	close(c.proposals)
-	clientErr := c.perun.Close()
 	if err := c.dialer.Close(); err != nil {
 		c.log().WithError(err).Error("Could not close Dialer")
 	}
