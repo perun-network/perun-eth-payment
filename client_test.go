@@ -26,6 +26,8 @@ import (
 	ethtest "perun.network/go-perun/backend/ethereum/wallet/test"
 	pkgcontext "perun.network/go-perun/pkg/context"
 	pkgtest "perun.network/go-perun/pkg/test"
+	"perun.network/go-perun/wire"
+	"perun.network/go-perun/wire/net"
 
 	payment "github.com/perun-network/perun-eth-payment"
 )
@@ -44,18 +46,26 @@ var chainID = big.NewInt(1337)
 // These tests need a running eth chain. Example:
 // ganache-cli -g 10 -e 1000 -m "pistol kiwi shrug future ozone ostrich match remove crucial oblige cream critic"
 
-type setup struct {
-	ctx, cancelled         context.Context
-	alice, bob             *payment.Client
-	aliceWallet, bobWallet *payment.Wallet
-	aliceCh, bobCh         *payment.Channel
-	bobPeer, alicePeer     payment.Peer
-	// Since `Balance` has `My` and `Other` fields, a balance looks different
-	// depending on the party that looks at it. We therefore save the balance
-	// twice.
-	initBalsAlice, initBalsBob payment.Balance
-	adj, ah                    common.Address
-}
+type (
+	setup struct {
+		ctx, cancelled         context.Context
+		alice, bob             *payment.Client
+		aliceWallet, bobWallet *payment.Wallet
+		aliceCh, bobCh         *payment.Channel
+		bobPeer, alicePeer     payment.Peer
+		// Since `Balance` has `My` and `Other` fields, a balance looks different
+		// depending on the party that looks at it. We therefore save the balance
+		// twice.
+		initBalsAlice, initBalsBob payment.Balance
+		adj, ah                    common.Address
+	}
+	mockedListener struct {
+		closed bool
+	}
+	mockedDialer struct {
+		closed bool
+	}
+)
 
 func newSetup(ctx context.Context, t *testing.T) *setup {
 	require := require.New(t)
@@ -84,6 +94,26 @@ func newSetup(ctx context.Context, t *testing.T) *setup {
 		initBalsAlice: payment.MakeBals(aliceBal, bobBal),
 		initBalsBob:   payment.MakeBals(bobBal, aliceBal),
 	}
+}
+
+func (*mockedListener) Accept() (net.Conn, error) {
+	return nil, nil
+}
+
+func (l *mockedListener) Close() error {
+	l.closed = true
+	return nil
+}
+
+func (*mockedDialer) Dial(context.Context, wire.Address) (net.Conn, error) {
+	return nil, nil
+}
+
+func (*mockedDialer) Register(wire.Address, string) {}
+
+func (d *mockedDialer) Close() error {
+	d.closed = true
+	return nil
 }
 
 func TestWallet(t *testing.T) {
@@ -116,6 +146,23 @@ func TestNewClient(t *testing.T) {
 	cfg = payment.MakeConfig(ipAlice, chain, 0)
 	_, err = payment.NewClient(wallet, cfg)
 	assert.Error(t, err)
+}
+
+func TestNewClient_Options(t *testing.T) {
+	wallet, err := payment.NewWalletSK(chainID, skAlice)
+	require.NoError(t, err)
+	cfg := payment.MakeConfig(ipAlice, chain, challengeDuration)
+
+	var dialer mockedDialer
+	var listener mockedListener
+	client, err := payment.NewClient(wallet, cfg, payment.WithDialer(&dialer), payment.WithListener(&listener))
+
+	require.NoError(t, err)
+	assert.False(t, dialer.closed)
+	assert.False(t, listener.closed)
+	assert.NoError(t, client.Close(context.Background()))
+	assert.True(t, dialer.closed)
+	assert.True(t, listener.closed)
 }
 
 func TestAliceBob(t *testing.T) {
