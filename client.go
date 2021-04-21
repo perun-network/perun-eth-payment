@@ -69,11 +69,7 @@ type Client struct {
 
 // NewClient creates a new client.
 // The account from `wallet` will be used to send on-chain transactions.
-// `host` is the ip:port that the client should listen on for connections.
-// `chainURL` is the URL of your Ethereum node.
-// In the local ganache-cli case this would be: ws://0.0.0.0:8545
-// `challengeDuration` is the time in seconds that an on-chain challenge
-// will last. This should be at least 3 times the average block time.
+// Pass one or more `ClientOption`s to modify the default behaviour.
 func NewClient(wallet *Wallet, cfg Config, opts ...ClientOption) (*Client, error) {
 	if uint64(cfg.ChallengeDuration) == 0 {
 		return nil, errors.New("invalid challenge duration")
