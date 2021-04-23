@@ -32,7 +32,7 @@ import (
 )
 
 type (
-	// Peer identifies a known peer. Can only be created with Client.AddPeer.
+	// Peer identifies a known peer. Can only be created with Client.RegisterPeer.
 	Peer struct {
 		addr  common.Address
 		alias string

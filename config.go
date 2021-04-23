@@ -31,6 +31,11 @@ type Config struct {
 
 // MakeConfig returns a new Config. All options that are not passed as
 // arguments are set to default values. You can still modify them manually.
+// `host` is the ip:port that the client should listen on for connections.
+// `chainURL` is the URL of your Ethereum node.
+// In the local ganache-cli case this would be: ws://0.0.0.0:8545
+// `challengeDuration` is the time in seconds that an on-chain challenge
+// will last. This should be at least 3 times the average block time.
 func MakeConfig(host, chainURL string, challengeDuration time.Duration) Config {
 	return Config{
 		Host:               host,

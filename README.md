@@ -48,10 +48,17 @@ func main() {
 	wallet, err := payment.NewWalletHD(big.NewInt(5), "your mnemonic", 1)
 	if err != nil { /* handle error */ }
 	
-	// Setup config struct
+	// Setup config struct and client
 	config := payment.MakeConfig("127.0.0.1:6444", "ws://127.0.0.1:8454", 60 * time.Second)
 	client, err := payment.NewClient(wallet, config)
 	if err != nil { /* handle error */ }
+	// Long context that will be used from now on
+	ctx, cancel := context.WithTimeout(context.Background(), 10 * time.Minute)
+	defer cancel()
+
+	// Set the contract addresses of the Adjudicator and Assetholder
+	client.Init(ctx, common.HexToAddress("0x20e1D1642284AdB74520f0e91835bbc6d5ec3415"),
+			         common.HexToAddress("0x3f6629d37E84E6Da88978198c9A1B228C5722085"))
 	
 	// Register the peer that we want to open a channel with.
 	bobAddr := ethwallet.AsWalletAddr(common.HexToAddress("0xB5d05705c467bfEd944B6769A689c7766CC1f805"))
@@ -60,8 +67,6 @@ func main() {
 
 	// Set the initial balance for the channel and open it.
 	initBals := payment.MakeBals(payment.MakeAmountFromETH(1), payment.MakeAmountFromETH(1))
-	ctx, cancel := context.WithTimeout(context.Background(), 10 * time.Minute)
-	defer cancel()
 	channel, err := client.ProposeChannel(ctx, bob, initBals)
 	if err != nil { /* handle error */ }
 
