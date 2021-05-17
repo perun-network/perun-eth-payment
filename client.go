@@ -289,7 +289,7 @@ func (c *Client) HandleProposal(_prop client.ChannelProposal, responder *client.
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
 
-	prop, peer, err := c.isValid(_prop)
+	prop, from, err := c.isValid(_prop)
 	if err != nil {
 		c.log().WithError(err).Warn("Received invalid channel proposal")
 		err = responder.Reject(c.closer.Ctx(), err.Error())
@@ -297,7 +297,7 @@ func (c *Client) HandleProposal(_prop client.ChannelProposal, responder *client.
 		return
 	}
 
-	c.proposals <- newChannelProposal(c, *peer, prop, responder)
+	c.proposals <- newChannelProposal(c, from, prop, responder)
 }
 
 // HandleUpdate DO NOT CALL.
@@ -310,50 +310,47 @@ func (c *Client) HandleUpdate(update client.ChannelUpdate, responder *client.Upd
 	ch.handleUpdate(update, responder)
 }
 
-func (c *Client) isValid(_prop client.ChannelProposal) (*client.LedgerChannelProposal, *Peer, error) {
+func (c *Client) isValid(_prop client.ChannelProposal) (*client.LedgerChannelProposal, common.Address, error) {
 	if c.ah == (common.Address{}) {
-		return nil, nil, errors.New("asset holder contract not set")
+		return nil, common.Address{}, errors.New("asset holder contract not set")
 	}
 	prop, ok := _prop.(*client.LedgerChannelProposal)
 	if !ok {
-		return nil, nil, errors.New("not a ledger channel")
+		return nil, common.Address{}, errors.New("not a ledger channel")
 	}
-	// Find the Peer of this proposal.
-	peer, ok := c.peers[ethwallet.AsEthAddr(prop.Participant)]
+	from, ok := prop.Participant.(*ethwallet.Address)
 	if !ok {
-		// Should be prevented by go-perun.
-		return nil, nil, errors.New("unknown peer")
+		return nil, common.Address{}, errors.New("wrong address type")
 	}
-
 	if _, ok := prop.App.(*payment.App); !ok {
-		return nil, nil, errors.New("wrong app type")
+		return nil, common.Address{}, errors.New("wrong app type")
 	}
 	if !prop.App.Def().Equals(app.Def()) {
-		return nil, nil, errors.New("wrong app def")
+		return nil, common.Address{}, errors.New("wrong app def")
 	}
 	if !payment.IsData(prop.InitData) {
-		return nil, nil, errors.New("wrong init data")
+		return nil, common.Address{}, errors.New("wrong init data")
 	}
 	if len(prop.InitBals.Assets) != 1 {
-		return nil, nil, errors.New("more than one asset")
+		return nil, common.Address{}, errors.New("more than one asset")
 	}
 	asset, ok := prop.InitBals.Assets[assetIdx].(*ethchannel.Asset)
 	if !ok {
-		return nil, nil, errors.New("wrong asset type")
+		return nil, common.Address{}, errors.New("wrong asset type")
 	}
 	if !asset.Equals(ethwallet.AsWalletAddr(c.ah)) {
-		return nil, nil, errors.New("wrong asset address")
+		return nil, common.Address{}, errors.New("wrong asset address")
 	}
 	if !prop.FundingAgreement.Equal(prop.InitBals.Balances) {
-		return nil, nil, errors.New("funding agreement does not match init bals")
+		return nil, common.Address{}, errors.New("funding agreement does not match init bals")
 	}
 	if prop.ChallengeDuration != c.cfg.challengeDurationSec() {
-		return nil, nil, errors.New("wrong challenge duration")
+		return nil, common.Address{}, errors.New("wrong challenge duration")
 	}
 	if len(prop.Peers) != 2 {
-		return nil, nil, errors.New("not a two party channel")
+		return nil, common.Address{}, errors.New("not a two party channel")
 	}
-	return prop, &peer, nil
+	return prop, common.Address(*from), nil
 }
 
 func (c *Client) addChannel(_ch *client.Channel) *Channel {

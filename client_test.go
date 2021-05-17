@@ -23,6 +23,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	ewallet "perun.network/go-perun/backend/ethereum/wallet"
 	ethtest "perun.network/go-perun/backend/ethereum/wallet/test"
 	pkgcontext "perun.network/go-perun/pkg/context"
 	pkgtest "perun.network/go-perun/pkg/test"
@@ -51,6 +52,7 @@ type (
 		ctx, cancelled         context.Context
 		alice, bob             *payment.Client
 		aliceWallet, bobWallet *payment.Wallet
+		aliceAddr, bobAddr     common.Address
 		aliceCh, bobCh         *payment.Channel
 		bobPeer, alicePeer     payment.Peer
 		// Since `Balance` has `My` and `Other` fields, a balance looks different
@@ -91,6 +93,8 @@ func newSetup(ctx context.Context, t *testing.T) *setup {
 		cancelled: cancelled,
 		alice:     alice, bob: bob,
 		aliceWallet: aliceWallet, bobWallet: bobWallet,
+		aliceAddr:     ewallet.AsEthAddr(aliceWallet.Address),
+		bobAddr:       ewallet.AsEthAddr(bobWallet.Address),
 		initBalsAlice: payment.MakeBals(aliceBal, bobBal),
 		initBalsBob:   payment.MakeBals(bobBal, aliceBal),
 	}
@@ -265,12 +269,12 @@ func testOpen(s *setup, t *testing.T) {
 		// Reject first channel.
 		prop := <-s.bob.Proposals()
 		require.Equal(prop.Balance, s.initBalsBob)
-		require.Equal(prop.From, s.alicePeer)
+		require.Equal(prop.From, s.aliceAddr)
 		testProposalResponse(s, prop, false, t)
 		// Accept second channel.
 		prop = <-s.bob.Proposals()
 		require.Equal(prop.Balance, s.initBalsBob)
-		require.Equal(prop.From, s.alicePeer)
+		require.Equal(prop.From, s.aliceAddr)
 		s.bobCh = testProposalResponse(s, prop, true, t)
 	})
 

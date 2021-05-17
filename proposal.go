@@ -17,6 +17,7 @@ package payment
 import (
 	"context"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	"perun.network/go-perun/client"
 	pkgatomic "perun.network/go-perun/pkg/sync/atomic"
@@ -30,11 +31,11 @@ type ChannelProposal struct {
 	client    *Client
 	prop      *client.LedgerChannelProposal
 	responder *client.ProposalResponder
-	From      Peer    // Peer that sent it.
-	Balance   Balance // Initial balance of the channel.
+	From      common.Address // Address that sent it.
+	Balance   Balance        // Initial balance of the channel.
 }
 
-func newChannelProposal(client *Client, peer Peer, prop *client.LedgerChannelProposal, responder *client.ProposalResponder) *ChannelProposal {
+func newChannelProposal(client *Client, from common.Address, prop *client.LedgerChannelProposal, responder *client.ProposalResponder) *ChannelProposal {
 	// The proposer always has index 0 and we are not the proposer.
 	myBal := MakeAmountFromWEI(prop.InitBals.Balances[assetIdx][1])
 	otherBal := MakeAmountFromWEI(prop.InitBals.Balances[assetIdx][0])
@@ -43,7 +44,7 @@ func newChannelProposal(client *Client, peer Peer, prop *client.LedgerChannelPro
 		client:    client,
 		prop:      prop,
 		responder: responder,
-		From:      peer,
+		From:      from,
 		Balance:   MakeBals(myBal, otherBal),
 	}
 }
